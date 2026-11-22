@@ -19,6 +19,7 @@ use Plugins::Spotty::Helper;
 use Plugins::Spotty::OPML;
 use Plugins::Spotty::ProtocolHandler;
 
+use constant CONNECT_HELPER_VERSION => '0.12.0';
 use constant CAN_IMPORTER => (Slim::Utils::Versions->compareVersions($::VERSION, '8.0.0') >= 0);
 use constant KILL_PROCESS_INTERVAL => 3600;
 
@@ -69,6 +70,8 @@ sub initPlugin {
 			'recently-played' => -1,
 		},
 		accountSwitcherMenu => 0,
+		disableDiscovery => 0,
+		checkDaemonConnected => 0,
 		displayNames => {},
 		products => {},
 		helper => '',
@@ -108,6 +111,12 @@ sub initPlugin {
 			return 1;
 		});
 	}
+
+	# we probably turned this on for too many users - let's start over
+	$prefs->migrate(2, sub {
+		$prefs->set('checkDaemonConnected', 0);
+		return 1;
+	});
 
 	# Spotty seems to be disabling all those hosts... use fallback by default now...
 	$prefs->migrate(3, sub {
@@ -155,6 +164,8 @@ sub postinitPlugin { if (main::TRANSCODING) {
 
 	# we're going to hijack the Spotify URI schema
 	Slim::Player::ProtocolHandlers->registerHandler('spotify', 'Plugins::Spotty::ProtocolHandler');
+
+	$class->canSpotifyConnect();
 
 	# if user has the Don't Stop The Music plugin enabled, register ourselves
 	if ( Slim::Utils::PluginManager->isEnabled('Slim::Plugin::DontStopTheMusic::Plugin')
@@ -330,6 +341,30 @@ sub getAPIHandler {
 	return $api;
 }
 
+sub canSpotifyConnect {
+	my ($class, $dontInit) = @_;
+
+	# make sure the helper has been found and its capabilities have been read
+	Plugins::Spotty::Helper->get();
+
+	# the helper has to be able to report Connect events back to us
+	if ( !Plugins::Spotty::Helper->getCapability('connect') ) {
+		main::INFOLOG && $log->is_info && $log->info("The Spotty helper does not support Connect mode.");
+		return;
+	}
+
+	require Plugins::Spotty::Connect;
+
+	Plugins::Spotty::Connect->init() unless $dontInit;
+
+	return 1;
+}
+
+sub isSpotifyConnect {
+	my $class = shift;
+	return $class->canSpotifyConnect() && Plugins::Spotty::Connect->isSpotifyConnect(@_);
+}
+
 # unused, left back in for backwards compatibility
 sub canDiscovery { 1 }
 
@@ -371,7 +406,12 @@ sub killHangingProcesses {
 # we only run when transcoding is enabled, but shutdown would be called no matter what
 sub shutdownPlugin { if (main::TRANSCODING) {
 	Plugins::Spotty::AccountHelper->purgeAudioCache(1);
+
 	__PACKAGE__->killHangingProcesses(1);
+
+	if (__PACKAGE__->canSpotifyConnect()) {
+		Plugins::Spotty::Connect->shutdown();
+	}
 } }
 
 1;
