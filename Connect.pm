@@ -548,7 +548,8 @@ sub cacheFolder {
 
 		if ( !-e catfile($playerCacheFolder, 'credentials.json') ) {
 			require File::Copy;
-			File::Copy::copy(catfile($cacheFolder, 'credentials.json'), catfile($playerCacheFolder, 'credentials.json'));
+			# the Connect daemon is only accepted with the credentials from the player authorization
+			File::Copy::copy(Plugins::Spotty::AccountHelper->getPlayerCredentials() || catfile($cacheFolder, 'credentials.json'), catfile($playerCacheFolder, 'credentials.json'));
 		}
 		$cacheFolder = $playerCacheFolder;
 	}
