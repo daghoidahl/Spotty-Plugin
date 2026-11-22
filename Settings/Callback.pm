@@ -20,7 +20,6 @@ use constant CALLBACK_URL => 'https://api.lms-community.org/auth/callback';
 use constant REGISTER_CALLBACK_URL => 'https://api.lms-community.org/auth/prepare';
 
 use constant SCOPE => join('+', qw(
-	playlist-read
 	playlist-read-private
 	playlist-read-collaborative
 	playlist-modify-public
@@ -37,8 +36,6 @@ use constant SCOPE => join('+', qw(
 	user-read-playback-state
 	user-modify-playback-state
 	user-read-currently-playing
-	user-modify-private
-	user-modify
 	user-read-playback-position
 	user-read-recently-played
 ));
